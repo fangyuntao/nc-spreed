@@ -31,6 +31,7 @@ import { EventBus } from '../services/EventBus.js'
 import {
 	getFileTemplates,
 	shareFile,
+	shareMultipleFiles,
 } from '../services/filesSharingServices.js'
 import { setAttachmentFolder } from '../services/settingsService.js'
 import { findUniquePath, getFileExtension } from '../utils/fileUpload.js'
@@ -281,22 +282,23 @@ const actions = {
 
 		EventBus.$emit('upload-start')
 
-		// Tag previously indexed files and add temporary messages to the MessagesList
-		// If caption is provided, attach to the last temporary message
-		const lastIndex = getters.getUploadsArray(uploadId).at(-1).at(0)
-		for (const [index, uploadedFile] of getters.getUploadsArray(uploadId)) {
-			// mark all files as uploading
-			commit('markFileAsUploading', { uploadId, index })
-			// Store the previously created temporary message
-			const temporaryMessage = {
-				...uploadedFile.temporaryMessage,
-				message: index === lastIndex ? caption : '{file}',
-			}
-			// Add temporary messages (files) to the messages list
-			dispatch('addTemporaryMessage', temporaryMessage)
-			// Scroll the message list
-			EventBus.$emit('scroll-chat-to-bottom')
+		// Check for quantity of files to upload
+		const isMultipleFilesUpload = getters.getUploadsArray(uploadId).length !== 1
+
+		// Process single temporary message for single file / group of files and put it to the messages list
+		const temporaryMessage = {
+			...getters.getUploadsArray(uploadId)[0][1].temporaryMessage,
+			messageParameters: {},
+			message: caption,
 		}
+		for (const [index, uploadedFile] of getters.getUploadsArray(uploadId)) {
+			commit('markFileAsUploading', { uploadId, index })
+			temporaryMessage.messageParameters[`file-${index}`] = uploadedFile.temporaryMessage.messageParameters.file
+		}
+		// Add temporary messages (files) to the messages list
+		dispatch('addTemporaryMessage', temporaryMessage)
+		// Scroll the message list
+		EventBus.$emit('scroll-chat-to-bottom')
 
 		// Iterate again and perform the uploads
 		await Promise.allSettled(getters.getUploadsArray(uploadId).map(async ([index, uploadedFile]) => {
@@ -338,24 +340,28 @@ const actions = {
 					showError(t('spreed', 'Error while uploading file "{fileName}"', { fileName }))
 				}
 
-				// Mark the upload as failed in the store
 				commit('markFileAsFailedUpload', { uploadId, index })
-				dispatch('markTemporaryMessageAsFailed', { message: uploadedFile.temporaryMessage, reason })
+				dispatch('markTemporaryMessageAsFailed', { message: temporaryMessage, reason })
 			}
 		}))
 
 		// Share the files, that have successfully been uploaded from the store, to the conversation
-		await Promise.all(getters.getShareableFiles(uploadId).map(async ([index, shareableFile]) => {
+		const shareIds = await Promise.all(getters.getShareableFiles(uploadId).map(async ([index, shareableFile]) => {
 			const path = shareableFile.sharePath
-			const temporaryMessage = shareableFile.temporaryMessage
-			const metadata = (caption && index === lastIndex)
-				? JSON.stringify({ messageType: temporaryMessage.messageType, caption })
-				: JSON.stringify({ messageType: temporaryMessage.messageType })
+			const { referenceId } = shareableFile.temporaryMessage
+			const metadata = JSON.stringify({
+				messageType: temporaryMessage.messageType,
+				caption: caption ?? '',
+				noMessage: isMultipleFilesUpload,
+			})
 			try {
 				const token = temporaryMessage.token
 				dispatch('markFileAsSharing', { uploadId, index })
-				await shareFile(path, token, temporaryMessage.referenceId, metadata)
+				const response = await shareFile(path, token, referenceId, metadata)
 				dispatch('markFileAsShared', { uploadId, index })
+
+				// return share id of file returned from the server
+				return response.data.ocs.data.id
 			} catch (error) {
 				if (error?.response?.status === 403) {
 					showError(t('spreed', 'You are not allowed to share files'))
@@ -366,6 +372,10 @@ const actions = {
 				console.error('An error happened when trying to share your file: ', error)
 			}
 		}))
+
+		if (isMultipleFilesUpload) {
+			await shareMultipleFiles(temporaryMessage.token, shareIds, caption, temporaryMessage.actorDisplayName, temporaryMessage.referenceId)
+		}
 		EventBus.$emit('upload-finished')
 	},
 	/**

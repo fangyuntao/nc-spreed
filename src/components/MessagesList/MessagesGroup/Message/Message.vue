@@ -503,9 +503,10 @@ export default {
 		},
 
 		renderedMessage() {
-			if (this.messageParameters?.file && this.message !== '{file}') {
-				// Add a new line after file to split content into different paragraphs
-				return '{file}' + '\n\n' + this.message
+			// Add a new line after file to split content into different paragraphs
+			const fileReferences = Object.keys(this.messageParameters).filter(key => key.includes('file'))
+			if (fileReferences?.length && this.message !== '{file}') {
+				return fileReferences.map(ref => `{${ref}}`).join('') + '\n\n' + this.message
 			} else {
 				return this.message
 			}
