@@ -6,7 +6,7 @@ import Vuex from 'vuex'
 import { showError } from '@nextcloud/dialogs'
 
 import client from '../services/DavClient.js'
-import { shareFile } from '../services/filesSharingServices.js'
+import { shareFile, shareMultipleFiles } from '../services/filesSharingServices.js'
 import { setAttachmentFolder } from '../services/settingsService.js'
 import { findUniquePath, getFileExtension } from '../utils/fileUpload.js'
 import fileUploadStore from './fileUploadStore.js'
@@ -20,6 +20,7 @@ jest.mock('../utils/fileUpload', () => ({
 }))
 jest.mock('../services/filesSharingServices', () => ({
 	shareFile: jest.fn(),
+	shareMultipleFiles: jest.fn(),
 }))
 jest.mock('../services/settingsService', () => ({
 	setAttachmentFolder: jest.fn(),
@@ -165,7 +166,7 @@ describe('fileUploadStore', () => {
 			expect(client.putFileContents).toHaveBeenCalledWith(`/files/current-user${uniqueFileName}`, fileBuffer, expect.anything())
 
 			expect(shareFile).toHaveBeenCalledTimes(1)
-			expect(shareFile).toHaveBeenCalledWith(`/${uniqueFileName}`, 'XXTOKENXX', 'reference-id-1', '{"caption":"text-caption"}')
+			expect(shareFile).toHaveBeenCalledWith(`/${uniqueFileName}`, 'XXTOKENXX', 'reference-id-1', '{"caption":"text-caption","noMessage":false}')
 
 			expect(mockedActions.addTemporaryMessage).toHaveBeenCalledTimes(1)
 			expect(store.getters.currentUploadId).not.toBeDefined()
@@ -205,6 +206,7 @@ describe('fileUploadStore', () => {
 			shareFile
 				.mockResolvedValueOnce({ data: { ocs: { data: { id: '1' } } } })
 				.mockResolvedValueOnce({ data: { ocs: { data: { id: '2' } } } })
+			shareMultipleFiles.mockResolvedValue()
 
 			await store.dispatch('uploadFiles', { uploadId: 'upload-id1', caption: 'text-caption' })
 
@@ -215,13 +217,13 @@ describe('fileUploadStore', () => {
 			for (const index in files) {
 				expect(findUniquePath).toHaveBeenCalledWith(client, '/files/current-user', '/Talk/' + files[index].name)
 				expect(client.putFileContents).toHaveBeenCalledWith(`/files/current-user/Talk/${files[index].name}uniq`, fileBuffers[index], expect.anything())
+				expect(shareFile).toHaveBeenCalledWith(`//Talk/${files[index].name}uniq`, 'XXTOKENXX', 'reference-id-' + (Number(index) + 1), '{"caption":"text-caption","noMessage":true}')
 			}
 
-			expect(shareFile).toHaveBeenCalledTimes(2)
-			expect(shareFile).toHaveBeenNthCalledWith(1, '//Talk/' + files[0].name + 'uniq', 'XXTOKENXX', 'reference-id-1', '{}')
-			expect(shareFile).toHaveBeenNthCalledWith(2, '//Talk/' + files[1].name + 'uniq', 'XXTOKENXX', 'reference-id-2', '{"caption":"text-caption"}')
+			expect(shareMultipleFiles).toHaveBeenCalledTimes(1)
+			expect(shareMultipleFiles).toHaveBeenCalledWith('XXTOKENXX', ['1', '2'], 'text-caption', undefined, 'reference-id-1')
 
-			expect(mockedActions.addTemporaryMessage).toHaveBeenCalledTimes(2)
+			expect(mockedActions.addTemporaryMessage).toHaveBeenCalledTimes(1)
 			expect(store.getters.currentUploadId).not.toBeDefined()
 		})
 

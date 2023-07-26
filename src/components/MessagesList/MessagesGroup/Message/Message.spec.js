@@ -422,6 +422,41 @@ describe('Message.vue', () => {
 				expect(messageEl.props('text')).toBe('{file}' + '\n\n' + caption)
 			})
 
+			test('renders multiple file previews', () => {
+				const params = {
+					actor: {
+						id: 'alice',
+						name: 'Alice',
+						type: 'user',
+					},
+					'file-1': {
+						path: 'some/path',
+						type: 'file',
+					},
+					'file-2': {
+						path: 'some/path',
+						type: 'file',
+					},
+				}
+				renderRichObject(
+					'{file-1} {file-2}',
+					params, {
+						actor: {
+							component: Mention,
+							props: params.actor,
+						},
+						'file-1': {
+							component: FilePreview,
+							props: params['file-1'],
+						},
+						'file-2': {
+							component: FilePreview,
+							props: params['file-2'],
+						},
+					}
+				)
+			})
+
 			test('renders deck cards', () => {
 				const params = {
 					actor: {
