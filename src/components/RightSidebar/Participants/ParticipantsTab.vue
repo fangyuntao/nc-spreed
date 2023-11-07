@@ -188,6 +188,12 @@ export default {
 	watch: {
 		searchText(value) {
 			this.isFocused = !!value
+		},
+
+		isActive(value) {
+			if (value && this.pendingChanges) {
+				this.debounceUpdateParticipants()
+			}
 		}
 	},
 
