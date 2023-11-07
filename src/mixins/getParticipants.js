@@ -79,7 +79,7 @@ const getParticipants = {
 		},
 
 		debounceUpdateParticipants() {
-			if (!this.isActive) {
+			if (!this.isActive && !this.isInCall) {
 				return
 			}
 
