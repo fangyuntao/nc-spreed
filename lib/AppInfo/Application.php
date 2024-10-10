@@ -106,10 +106,11 @@ use OCA\Talk\Search\CurrentMessageSearch;
 use OCA\Talk\Search\MessageSearch;
 use OCA\Talk\Search\UnifiedSearchCSSLoader;
 use OCA\Talk\Search\UnifiedSearchFilterPlugin;
+use OCA\Talk\Settings\BeforePreferenceSetEventListener;
 use OCA\Talk\Settings\Personal;
 use OCA\Talk\SetupCheck\BackgroundBlurLoading;
 use OCA\Talk\SetupCheck\FederationLockCache;
-use OCA\Talk\SetupCheck\RecommendCache;
+use OCA\Talk\SetupCheck\HighPerformanceBackend;
 use OCA\Talk\SetupCheck\RecordingBackend;
 use OCA\Talk\SetupCheck\SIPConfiguration;
 use OCA\Talk\Share\Listener as ShareListener;
@@ -124,6 +125,7 @@ use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use OCP\Collaboration\AutoComplete\AutoCompleteFilterEvent;
 use OCP\Collaboration\Resources\IProviderManager;
 use OCP\Collaboration\Resources\LoadAdditionalScriptsEvent;
+use OCP\Config\BeforePreferenceSetEvent;
 use OCP\EventDispatcher\IEventDispatcher;
 use OCP\Federation\ICloudFederationProvider;
 use OCP\Federation\ICloudFederationProviderManager;
@@ -177,6 +179,7 @@ class Application extends App implements IBootstrap {
 		$context->registerEventListener(BeforeTemplateRenderedEvent::class, PublicShareTemplateLoader::class);
 		$context->registerEventListener(BeforeTemplateRenderedEvent::class, PublicShareAuthTemplateLoader::class);
 		$context->registerEventListener(LoadSidebar::class, FilesTemplateLoader::class);
+		$context->registerEventListener(BeforePreferenceSetEvent::class, BeforePreferenceSetEventListener::class);
 
 		// Activity listeners
 		$context->registerEventListener(AttendeesAddedEvent::class, ActivityListener::class);
@@ -338,7 +341,7 @@ class Application extends App implements IBootstrap {
 
 		$context->registerTeamResourceProvider(TalkTeamResourceProvider::class);
 
-		$context->registerSetupCheck(RecommendCache::class);
+		$context->registerSetupCheck(HighPerformanceBackend::class);
 		$context->registerSetupCheck(FederationLockCache::class);
 		$context->registerSetupCheck(RecordingBackend::class);
 		$context->registerSetupCheck(SIPConfiguration::class);
